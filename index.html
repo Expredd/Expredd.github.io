@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Don't leave yet!</title>
+  <title>Don't leave yet! – Bilgilerin</title>
   <style>
     body {
       font-family: monospace;
@@ -13,14 +13,8 @@
       line-height: 1.5;
       margin: 0;
     }
-    h1 {
-      color: #0f0;
-      margin: 0 0 15px;
-    }
-    h2 {
-      color: #0f0;
-      margin: 25px 0 8px;
-    }
+    h1 { color: #0f0; margin: 0 0 15px; }
+    h2 { color: #0f0; margin: 25px 0 8px; }
     pre {
       background: #111;
       padding: 10px;
@@ -30,108 +24,119 @@
       margin: 8px 0;
       font-size: 13px;
     }
-    #log {
-      max-height: 280px;
-      overflow-y: auto;
-      background: #000;
-      padding: 10px;
-      border: 1px solid #333;
-      margin: 15px 0;
-      font-size: 13px;
-    }
-    button {
-      background: #002200;
-      color: #0f0;
-      border: 1px solid #0f0;
-      padding: 8px 16px;
-      margin: 6px 10px 6px 0;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #004400;
-    }
-    .section {
-      margin-bottom: 20px;
-    }
-    #server-info {
-      white-space: pre-wrap;
-    }
+    .section { margin-bottom: 25px; }
+    .status { color: #0f0; font-weight: bold; }
+    .warning { color: #ff4444; font-size: 0.9em; }
   </style>
 </head>
 <body>
   <h1>Welcome, Eren Tunahan UÇAR!</h1>
 
   <div class="section">
-    <h2>About You (sunucu tarafı bilgi):</h2>
-    <pre id="server-info">Bu kısım Flask çalışırken dolar.
-Şu anda statik HTML'de olduğun için burası boş kalacak.
-Orijinal uygulamada IP, konum, User-Agent vs. buraya yazılıyor.</pre>
-  </div>
-
-  <div class="section">
-    <h2>Information Your Browser Gave Us:</h2>
+    <h2>Gerçek Zamanlı Tarayıcı & Cihaz Bilgileri</h2>
     <pre id="client-info">Yükleniyor...</pre>
   </div>
 
+  <div class="section">
+    <h2>Tahmini IP ve Konum (sunucusuz)</h2>
+    <pre id="ip-info">IP yükleniyor... (birkaç saniye sürebilir)</pre>
+    <p class="warning">Not: Bu bilgi üçüncü taraf bir servisten (ip-api.com) çekiliyor.</p>
+  </div>
+
   <script>
-    // Tarayıcıdan alınabilecek bilgileri topla
-    function getClientInfo() {
+    // ────────────────────────────────────────────────
+    // 1. Tarayıcı + Batarya + Donanım Bilgileri
+    // ────────────────────────────────────────────────
+    async function getClientInfo() {
       const nav = navigator;
       const scr = screen;
       const conn = nav.connection || {};
 
-      let batteryInfo = "Batarya bilgisi yok veya desteklenmiyor";
+      let battery = { level: "—", charging: "—", chargingTime: "—", dischargingTime: "—" };
 
-      // Batarya bilgisi (asenkron)
       if (nav.getBattery) {
-        nav.getBattery().then(b => {
-          batteryInfo = `Batarya: %${Math.round(b.level * 100)}  (${b.charging ? "şarj oluyor" : "şarjda değil"}, kalan: ${b.dischargingTime === Infinity ? "bilinmiyor" : b.dischargingTime + " sn"})`;
-          updateClientInfo();
-        }).catch(() => {});
+        try {
+          const bat = await nav.getBattery();
+          battery = {
+            level: `${Math.round(bat.level * 100)}%`,
+            charging: bat.charging ? "Şarj oluyor ⚡" : "Şarjda değil",
+            chargingTime: bat.chargingTime === Infinity ? "—" : `${bat.chargingTime} sn`,
+            dischargingTime: bat.dischargingTime === Infinity ? "—" : `${bat.dischargingTime} sn`
+          };
+        } catch (e) {
+          battery.level = "Batarya API desteklenmiyor / izin yok";
+        }
       }
 
-      const info = {
-        userAgent: nav.userAgent,
-        platform: nav.platform || '—',
-        languages: nav.languages?.join(', ') || nav.language || '—',
-        cookieEnabled: nav.cookieEnabled,
-        onLine: nav.onLine,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '—',
-        screen: `${scr.width} × ${scr.height} (piksel oranı: ${window.devicePixelRatio.toFixed(2)})`,
-        windowInner: `${window.innerWidth} × ${window.innerHeight}`,
-        colorDepth: `${scr.colorDepth} bit`,
-        hardwareConcurrency: nav.hardwareConcurrency || 'bilinmiyor',
-        deviceMemory: nav.deviceMemory ? `${nav.deviceMemory} GB (yaklaşık)` : 'bilinmiyor',
-        connection: conn.effectiveType ? `${conn.effectiveType} (${conn.downlink || '?'} Mbps)` : 'bilinmiyor',
-        battery: batteryInfo,
-        vendor: nav.vendor || '—',
-        maxTouchPoints: nav.maxTouchPoints || '—',
-        plugins: Array.from(nav.plugins).map(p => p.name).join(', ') || '—',
-        collectedAt: new Date().toISOString()
+      return {
+        Zaman: new Date().toLocaleString('tr-TR'),
+        UserAgent: nav.userAgent,
+        Platform: nav.platform || '—',
+        Diller: nav.languages?.join(', ') || nav.language || '—',
+        ZamanDilimi: Intl.DateTimeFormat().resolvedOptions().timeZone || '—',
+        Ekran: `${scr.width} × ${scr.height}  (piksel oranı: ${window.devicePixelRatio.toFixed(2)})`,
+        Pencere: `${window.innerWidth} × ${window.innerHeight}`,
+        RenkDerinligi: `${scr.colorDepth} bit`,
+        CPUÇekirdek: nav.hardwareConcurrency || 'bilinmiyor',
+        RAM_Tahmini: nav.deviceMemory ? `${nav.deviceMemory} GB` : 'bilinmiyor',
+        Bağlantı: conn.effectiveType ? `${conn.effectiveType} (~${conn.downlink || '?'} Mbps)` : '—',
+        Batarya: `${battery.level}  –  ${battery.charging}`,
+        ŞarjKalanSüre: battery.dischargingTime,
+        ŞarjOlmaSüresi: battery.chargingTime,
+        DokunmatikNokta: nav.maxTouchPoints || '—',
+        Vendor: nav.vendor || '—',
+        Çevrimiçi: nav.onLine ? 'Evet' : 'Hayır'
       };
-
-      return info;
     }
 
-    function updateClientInfo() {
-      const info = getClientInfo();
-      document.getElementById('client-info').textContent = JSON.stringify(info, null, 2);
-      
-      // İstersen konsola da yazdır
-      console.log("Tarayıcı Bilgileri:", info);
+    function updateClientDisplay() {
+      getClientInfo().then(info => {
+        document.getElementById('client-info').textContent = JSON.stringify(info, null, 2);
+      });
     }
 
-    // Sayfa yüklendiğinde çalıştır
+    // ────────────────────────────────────────────────
+    // 2. IP + yaklaşık konum çekme (sunucusuz)
+    // ────────────────────────────────────────────────
+    async function fetchIPInfo() {
+      try {
+        const res = await fetch('https://ipapi.co/json/');
+        // Alternatif: 'http://ip-api.com/json/' de kullanılabilir
+        const data = await res.json();
+
+        if (data.ip) {
+          const info = {
+            IP: data.ip,
+            Şehir: data.city || '—',
+            Ülke: data.country_name || data.country || '—',
+            Bölge: data.region || '—',
+            Enlem_Boylam: `${data.latitude || '?'} , ${data.longitude || '?'}`,
+            ISP: data.org || data.asn || '—',
+            SaatDilimi: data.timezone || '—'
+          };
+          document.getElementById('ip-info').textContent = JSON.stringify(info, null, 2);
+        } else {
+          throw new Error("IP alınamadı");
+        }
+      } catch (err) {
+        document.getElementById('ip-info').textContent = 
+          "IP bilgisi alınamadı.\n" +
+          "Sebep: " + err.message + "\n" +
+          "(Adblock / VPN / ağ kısıtlaması olabilir)";
+      }
+    }
+
+    // Başlat
     window.addEventListener('load', () => {
-      updateClientInfo();
+      updateClientDisplay();
+      fetchIPInfo();
 
-      // Batarya bilgisi gecikmeli gelebildiği için 1.5 sn sonra tekrar güncelle
-      setTimeout(updateClientInfo, 1500);
+      // Batarya ve bağlantı değişirse güncelle
+      setInterval(updateClientDisplay, 8000);
     });
 
-    // Ekran boyutu değişirse güncelle (ör: döndürme, pencere boyutlandırma)
-    window.addEventListener('resize', updateClientInfo);
+    // Ekran boyutu değişirse güncelle
+    window.addEventListener('resize', updateClientDisplay);
   </script>
-
 </body>
 </html>
